@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <label>Notify Sales Flow</label>
+    <processType>AutoLaunchedFlow</processType>
+    <status>Active</status>
+    <start>
+        <object>Order__c</object>
+        <triggerType>RecordAfterSave</triggerType>
+        <recordTriggerType>Update</recordTriggerType>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Status__c</field>
+            <operator>EqualTo</operator>
+            <value><stringValue>Approved</stringValue></value>
+        </filters>
+    </start>
+
+    <actionCalls>
+        <n>Send_Slack_Notification</n>
+        <label>Send Slack Notification</label>
+        <actionType>apex</actionType>
+        <actionName>SlackNotificationService</actionName>
+        <inputParameters>
+            <n>orderId</n>
+            <value><elementReference>$Record.Id</elementReference></value>
+        </inputParameters>
+        <inputParameters>
+            <n>message</n>
+            <value><stringValue>Order approved and ready for fulfillment</stringValue></value>
+        </inputParameters>
+        <connector><targetReference>Update_Invoice</targetReference></connector>
+    </actionCalls>
+
+    <recordUpdates>
+        <n>Update_Invoice</n>
+        <label>Update Invoice Status</label>
+        <object>Invoice__c</object>
+        <inputAssignments>
+            <field>Status__c</field>
+            <value><stringValue>Sent</stringValue></value>
+        </inputAssignments>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Order__c</field>
+            <operator>EqualTo</operator>
+            <value><elementReference>$Record.Id</elementReference></value>
+        </filters>
+    </recordUpdates>
+</Flow>

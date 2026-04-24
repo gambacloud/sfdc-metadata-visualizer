@@ -1,0 +1,14 @@
+{
+  "name": "sfdc-metadata-parser",
+  "version": "1.0.0",
+  "description": "Parses Salesforce metadata ZIP into a structured graph index",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "fast-xml-parser": "^4.3.4",
+    "yargs": "^17.7.2"
+  }
+}

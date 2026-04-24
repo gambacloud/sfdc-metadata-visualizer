@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <label>Order Validation Flow</label>
+    <processType>AutoLaunchedFlow</processType>
+    <status>Active</status>
+    <start>
+        <object>Order__c</object>
+        <triggerType>RecordBeforeSave</triggerType>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+    </start>
+
+    <decisions>
+        <name>Check_Status</name>
+        <label>Check Status</label>
+        <defaultConnector>
+            <targetReference>End</targetReference>
+        </defaultConnector>
+        <rules>
+            <name>Is_Submitted</name>
+            <label>Is Submitted</label>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record.Status__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue><stringValue>Submitted</stringValue></rightValue>
+            </conditions>
+            <connector><targetReference>Validate_Amount</targetReference></connector>
+        </rules>
+    </decisions>
+
+    <decisions>
+        <name>Validate_Amount</name>
+        <label>Validate Amount</label>
+        <defaultConnector>
+            <targetReference>Run_Approval_Subflow</targetReference>
+        </defaultConnector>
+        <rules>
+            <name>Amount_Zero</name>
+            <label>Amount Is Zero</label>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record.TotalAmount__c</leftValueReference>
+                <operator>LessThanOrEqualTo</operator>
+                <rightValue><numberValue>0</numberValue></rightValue>
+            </conditions>
+            <connector><targetReference>Throw_Error</targetReference></connector>
+        </rules>
+    </decisions>
+
+    <customErrors>
+        <name>Throw_Error</name>
+        <label>Throw Error</label>
+        <customErrorMessages>
+            <errorMessage>Order total must be greater than zero before submitting.</errorMessage>
+            <isFieldError>false</isFieldError>
+        </customErrorMessages>
+    </customErrors>
+
+    <subflows>
+        <name>Run_Approval_Subflow</name>
+        <label>Run Approval Subflow</label>
+        <flowName>Order_Approval_Flow</flowName>
+        <connector><targetReference>End</targetReference></connector>
+    </subflows>
+
+    <noMoreValuesConnector>
+        <targetReference>End</targetReference>
+    </noMoreValuesConnector>
+
+    <actionCalls>
+        <name>End</name>
+        <label>End</label>
+        <actionType>apex</actionType>
+        <actionName>OrderValidationLogger</actionName>
+        <inputParameters>
+            <name>orderId</name>
+            <value><elementReference>$Record.Id</elementReference></value>
+        </inputParameters>
+    </actionCalls>
+</Flow>

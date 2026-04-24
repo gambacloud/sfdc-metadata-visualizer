@@ -1,0 +1,8 @@
+node_modules/
+data/index.json
+data/positions.json
+demo-metadata.zip
+viewer/public/index.json
+dist/
+.DS_Store
+Thumbs.db

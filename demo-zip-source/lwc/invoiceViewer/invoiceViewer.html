@@ -1,0 +1,15 @@
+<template>
+    <lightning-card title="Invoice Viewer" icon-name="standard:invoice">
+        <div class="slds-p-around_medium">
+            <template if:true={invoice}>
+                <p><strong>Status:</strong> {invoice.Status__c}</p>
+                <p><strong>Due Date:</strong> {invoice.DueDate__c}</p>
+                <lightning-button
+                    label="Mark as Paid"
+                    onclick={handleMarkPaid}
+                    variant="success">
+                </lightning-button>
+            </template>
+        </div>
+    </lightning-card>
+</template>

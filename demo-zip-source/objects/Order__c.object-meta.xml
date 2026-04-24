@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Order</label>
+    <pluralLabel>Orders</pluralLabel>
+    <nameField>
+        <label>Order Name</label>
+        <type>Text</type>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <fields>
+        <fullName>Status__c</fullName>
+        <label>Status</label>
+        <type>Picklist</type>
+        <valueSet>
+            <valueSetDefinition>
+                <value><fullName>Draft</fullName></value>
+                <value><fullName>Submitted</fullName></value>
+                <value><fullName>Approved</fullName></value>
+                <value><fullName>Fulfilled</fullName></value>
+                <value><fullName>Cancelled</fullName></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>TotalAmount__c</fullName>
+        <label>Total Amount</label>
+        <type>Currency</type>
+        <precision>18</precision>
+        <scale>2</scale>
+    </fields>
+    <fields>
+        <fullName>Account__c</fullName>
+        <label>Account</label>
+        <type>Lookup</type>
+        <referenceTo>Account</referenceTo>
+        <relationshipName>Orders</relationshipName>
+    </fields>
+    <fields>
+        <fullName>SyncedToERP__c</fullName>
+        <label>Synced to ERP</label>
+        <type>Checkbox</type>
+        <defaultValue>false</defaultValue>
+    </fields>
+</CustomObject>

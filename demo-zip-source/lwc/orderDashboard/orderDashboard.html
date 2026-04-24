@@ -1,0 +1,26 @@
+<template>
+    <lightning-card title="Order Dashboard" icon-name="standard:orders">
+        <div class="slds-p-around_medium">
+            <lightning-button
+                label="New Order"
+                onclick={handleNewOrder}
+                variant="brand">
+            </lightning-button>
+
+            <lightning-datatable
+                data={orders}
+                columns={columns}
+                key-field="id"
+                onrowaction={handleRowAction}>
+            </lightning-datatable>
+
+            <!-- Embedded screen flow for creating new orders -->
+            <template if:true={showFlow}>
+                <lightning-flow
+                    flow-api-name="New_Order_Screen_Flow"
+                    onstatuschange={handleFlowStatusChange}>
+                </lightning-flow>
+            </template>
+        </div>
+    </lightning-card>
+</template>

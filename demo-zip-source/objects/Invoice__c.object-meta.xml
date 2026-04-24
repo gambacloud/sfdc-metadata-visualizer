@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Invoice</label>
+    <pluralLabel>Invoices</pluralLabel>
+    <nameField>
+        <label>Invoice Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>INV-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <fields>
+        <fullName>Order__c</fullName>
+        <label>Order</label>
+        <type>Lookup</type>
+        <referenceTo>Order__c</referenceTo>
+        <relationshipName>Invoices</relationshipName>
+    </fields>
+    <fields>
+        <fullName>Status__c</fullName>
+        <label>Status</label>
+        <type>Picklist</type>
+        <valueSet>
+            <valueSetDefinition>
+                <value><fullName>Draft</fullName></value>
+                <value><fullName>Sent</fullName></value>
+                <value><fullName>Paid</fullName></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>DueDate__c</fullName>
+        <label>Due Date</label>
+        <type>Date</type>
+    </fields>
+</CustomObject>
