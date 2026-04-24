@@ -1,5 +1,78 @@
 {
-  "dependencies": {
-    "archiver": "^7.0.1"
+  "name": "sfdc-metadata-visualizer",
+  "version": "1.0.0",
+  "description": "Salesforce metadata visualizer — DAG, Object-Centric, and Table views",
+  "author": "gambacloud",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron":      "electron .",
+    "build:viewer":  "cd viewer && npm install && npm run build",
+    "build:electron":"electron-builder",
+    "build:all":     "npm run build:viewer && npm run build:electron",
+    "dev":           "cd viewer && npm run dev"
+  },
+  "devDependencies": {
+    "electron":         "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId":       "com.gambacloud.sfdc-metadata-visualizer",
+    "productName": "SFDC Metadata Visualizer",
+    "copyright":   "Copyright © 2025 gambacloud",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "viewer/dist",
+        "to":   "viewer-dist",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "parser",
+        "to":   "parser",
+        "filter": ["**/*", "!node_modules"]
+      },
+      {
+        "from": "parser/node_modules",
+        "to":   "parser/node_modules",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "electron/icon.ico"
+    },
+    "nsis": {
+      "oneClick":           false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon":      "electron/icon.ico",
+      "uninstallerIcon":    "electron/icon.ico",
+      "installerHeaderIcon":"electron/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName":       "SFDC Metadata Visualizer"
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "electron/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "icon": "electron/icon.png",
+      "category": "Development"
+    }
   }
 }

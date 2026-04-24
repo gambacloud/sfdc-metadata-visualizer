@@ -3,6 +3,9 @@ data/index.json
 data/positions.json
 demo-metadata.zip
 viewer/public/index.json
+viewer/dist/
 dist/
+dist-electron/
 .DS_Store
 Thumbs.db
+*.log
