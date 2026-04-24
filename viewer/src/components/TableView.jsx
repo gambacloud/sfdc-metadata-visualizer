@@ -5,44 +5,29 @@ const ALL_TYPES = ['Flow', 'Trigger', 'ApexClass', 'CustomObject', 'PlatformEven
 
 // ── Built-in smart filters ────────────────────────────────────────────────────
 const SMART_FILTERS = [
+  { id: 'all', label: 'All', icon: '∗', fn: () => true },
   {
-    id: 'all',
-    label: 'All',
-    icon: '∗',
-    fn: () => true,
-  },
-  {
-    id: 'high_connectivity',
-    label: 'High Connectivity',
-    icon: '⚡',
+    id: 'high_connectivity', label: 'High Connectivity', icon: '⚡',
     description: 'Nodes with 5+ edges — likely hotspots',
     fn: (n, edgeMap) => ((edgeMap[n.name]?.out.length || 0) + (edgeMap[n.name]?.in.length || 0)) >= 5,
   },
   {
-    id: 'chain_risk',
-    label: 'Chain Risk',
-    icon: '⚠',
+    id: 'chain_risk', label: 'Chain Risk', icon: '⚠',
     description: 'Has inferred DML→Trigger edges (potential recursion)',
     fn: (n, edgeMap) => edgeMap[n.name]?.out.some(e => e.inferred) || edgeMap[n.name]?.in.some(e => e.inferred),
   },
   {
-    id: 'async',
-    label: 'Async / Batch',
-    icon: '⏳',
+    id: 'async', label: 'Async / Batch', icon: '⏳',
     description: 'Batch, Queueable, @future, Schedulable',
     fn: (n) => n.isBatch || n.isQueueable || n.isFuture || n.isSchedulable,
   },
   {
-    id: 'rest',
-    label: 'REST / Callout',
-    icon: '↗',
+    id: 'rest', label: 'REST / Callout', icon: '↗',
     description: 'REST endpoints or outbound callouts',
     fn: (n) => !!n.restResource || (n.callouts?.length > 0),
   },
   {
-    id: 'event_driven',
-    label: 'Event Driven',
-    icon: '📡',
+    id: 'event_driven', label: 'Event Driven', icon: '📡',
     description: 'Publishes or subscribes to Platform Events',
     fn: (n, edgeMap) =>
       n.type === 'PlatformEvent' ||
@@ -50,51 +35,50 @@ const SMART_FILTERS = [
       edgeMap[n.name]?.in.some(e => e.edgeType === 'event-subscribe'),
   },
   {
-    id: 'no_connections',
-    label: 'Isolated',
-    icon: '○',
+    id: 'no_connections', label: 'Isolated', icon: '○',
     description: 'No edges — dead code candidates',
     fn: (n, edgeMap) => !edgeMap[n.name] || (edgeMap[n.name].out.length + edgeMap[n.name].in.length === 0),
   },
   {
-    id: 'trigger_handlers',
-    label: 'Trigger Handlers',
-    icon: '{}',
+    id: 'trigger_handlers', label: 'Trigger Handlers', icon: '{}',
     description: 'Classes extending TriggerHandler',
     fn: (n) => n.isTriggerHandler,
   },
   {
-    id: 'invocable',
-    label: 'Invocable Apex',
-    icon: '⚙',
+    id: 'invocable', label: 'Invocable Apex', icon: '⚙',
     description: '@InvocableMethod — called from Flows',
     fn: (n) => n.isInvocable,
   },
   {
-    id: 'screen_flows',
-    label: 'Screen Flows',
-    icon: '🖥',
+    id: 'screen_flows', label: 'Screen Flows', icon: '🖥',
     description: 'User-facing screen flows',
     fn: (n) => n.type === 'Flow' && n.processType === 'Flow',
   },
   {
-    id: 'record_flows',
-    label: 'Record Flows',
-    icon: '⚡',
+    id: 'record_flows', label: 'Record Flows', icon: '⚡',
     description: 'Record-triggered automation flows',
     fn: (n) => n.type === 'Flow' && n.processType !== 'Flow',
+  },
+  {
+    id: 'has_formulas', label: 'Has Formulas', icon: 'ƒ',
+    description: 'Objects with formula fields or Flows with formula variables',
+    fn: (n) => (n.formulaFields?.length > 0) || (n.formulas?.length > 0),
+  },
+  {
+    id: 'cross_object_formula', label: 'Cross-Object Formula', icon: '↗ƒ',
+    description: 'Objects whose formula fields reference other objects (hidden dependencies)',
+    fn: (n) => n.formulaFields?.some(ff => ff.crossObjectRefs?.length > 0),
   },
 ];
 
 export default function TableView({ nodes, edges, selected, onSelect, typeFilters }) {
-  const [search,      setSearch]      = useState('');
-  const [smartFilter, setSmartFilter] = useState('all');
-  const [objectFilter,setObjectFilter]= useState('');
-  const [sortBy,      setSortBy]      = useState('type');
-  const [sortDir,     setSortDir]     = useState(1);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [search,       setSearch]      = useState('');
+  const [smartFilter,  setSmartFilter] = useState('all');
+  const [objectFilter, setObjectFilter]= useState('');
+  const [sortBy,       setSortBy]      = useState('type');
+  const [sortDir,      setSortDir]     = useState(1);
+  const [sidebarOpen,  setSidebarOpen] = useState(true);
 
-  // Edge map for filter functions
   const edgeMap = useMemo(() => {
     const m = {};
     edges.forEach(e => {
@@ -106,48 +90,43 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
     return m;
   }, [edges]);
 
-  // All unique objects for the object filter
   const allObjects = useMemo(() => {
     const objs = new Set(nodes.map(n => n.object).filter(Boolean));
     return [...objs].sort();
   }, [nodes]);
 
-  // Smart filter counts (for badges)
   const smartCounts = useMemo(() => {
     const counts = {};
-    SMART_FILTERS.forEach(sf => {
-      counts[sf.id] = nodes.filter(n => sf.fn(n, edgeMap)).length;
-    });
+    SMART_FILTERS.forEach(sf => { counts[sf.id] = nodes.filter(n => sf.fn(n, edgeMap)).length; });
     return counts;
   }, [nodes, edgeMap]);
 
   const filtered = useMemo(() => {
-    const q   = search.toLowerCase();
-    const sf  = SMART_FILTERS.find(f => f.id === smartFilter) || SMART_FILTERS[0];
-
+    const q  = search.toLowerCase();
+    const sf = SMART_FILTERS.find(f => f.id === smartFilter) || SMART_FILTERS[0];
     return nodes
       .filter(n => typeFilters.size === 0 || typeFilters.has(n.type))
       .filter(n => sf.fn(n, edgeMap))
       .filter(n => !objectFilter || n.object === objectFilter)
       .filter(n =>
         !q ||
-        n.name.toLowerCase().includes(q)  ||
-        (n.object  || '').toLowerCase().includes(q) ||
-        (n.label   || '').toLowerCase().includes(q) ||
-        (n.type    || '').toLowerCase().includes(q) ||
+        n.name.toLowerCase().includes(q) ||
+        (n.object || '').toLowerCase().includes(q) ||
+        (n.label  || '').toLowerCase().includes(q) ||
+        (n.type   || '').toLowerCase().includes(q) ||
         n.events?.some(ev => ev.toLowerCase().includes(q)) ||
         n.classCalls?.some(c => c.toLowerCase().includes(q)) ||
-        n.dmlObjects?.some(o => o.toLowerCase().includes(q))
+        n.dmlObjects?.some(o => o.toLowerCase().includes(q)) ||
+        n.formulaFields?.some(ff => ff.expression?.toLowerCase().includes(q))
       )
       .sort((a, b) => {
-        let va, vb;
         if (sortBy === 'edges') {
-          va = (edgeMap[a.name]?.out.length || 0) + (edgeMap[a.name]?.in.length || 0);
-          vb = (edgeMap[b.name]?.out.length || 0) + (edgeMap[b.name]?.in.length || 0);
+          const va = (edgeMap[a.name]?.out.length || 0) + (edgeMap[a.name]?.in.length || 0);
+          const vb = (edgeMap[b.name]?.out.length || 0) + (edgeMap[b.name]?.in.length || 0);
           return (vb - va) * sortDir;
         }
-        va = (a[sortBy] || '').toString().toLowerCase();
-        vb = (b[sortBy] || '').toString().toLowerCase();
+        const va = (a[sortBy] || '').toString().toLowerCase();
+        const vb = (b[sortBy] || '').toString().toLowerCase();
         return va < vb ? -sortDir : va > vb ? sortDir : 0;
       });
   }, [nodes, search, smartFilter, objectFilter, sortBy, sortDir, typeFilters, edgeMap]);
@@ -158,14 +137,12 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
   };
 
   const Th = ({ id, label, style = {} }) => (
-    <th onClick={() => toggleSort(id)}
-      style={{
-        padding: '9px 12px', textAlign: 'left', whiteSpace: 'nowrap',
-        color: sortBy === id ? C.accent : C.muted,
-        fontWeight: 600, fontSize: 10, letterSpacing: 1,
-        textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none',
-        ...style,
-      }}>
+    <th onClick={() => toggleSort(id)} style={{
+      padding: '9px 12px', textAlign: 'left', whiteSpace: 'nowrap',
+      color: sortBy === id ? C.accent : C.muted,
+      fontWeight: 600, fontSize: 10, letterSpacing: 1,
+      textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', ...style,
+    }}>
       {label}{sortBy === id ? (sortDir > 0 ? ' ↑' : ' ↓') : ''}
     </th>
   );
@@ -194,7 +171,6 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
           </div>
 
           <div style={{ overflowY: 'auto', flex: 1, padding: '8px 0' }}>
-            {/* Smart filters */}
             <div style={{ padding: '4px 14px 8px', fontFamily: 'JetBrains Mono', fontSize: 9, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase' }}>
               Smart Filters
             </div>
@@ -227,7 +203,6 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
               );
             })}
 
-            {/* Object filter */}
             {allObjects.length > 0 && (
               <>
                 <div style={{ padding: '12px 14px 6px', fontFamily: 'JetBrains Mono', fontSize: 9, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase' }}>
@@ -259,7 +234,6 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
             )}
           </div>
 
-          {/* Active filter summary */}
           {(smartFilter !== 'all' || objectFilter) && (
             <div style={{ padding: '10px 14px', borderTop: `1px solid ${C.border}` }}>
               <button onClick={() => { setSmartFilter('all'); setObjectFilter(''); }}
@@ -275,9 +249,8 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
         </div>
       )}
 
-      {/* ── Main table area ─────────────────────────────────────────────────── */}
+      {/* ── Main table ───────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        {/* Search + toggle */}
         <div style={{
           padding: '10px 14px', borderBottom: `1px solid ${C.border}`,
           display: 'flex', gap: 8, alignItems: 'center', background: C.panel, flexShrink: 0,
@@ -289,7 +262,7 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
             </button>
           )}
           <input
-            placeholder="🔍  Search name, object, label, DML target..."
+            placeholder="🔍  Search name, object, label, DML, formula expression..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
@@ -303,7 +276,6 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
           </span>
         </div>
 
-        {/* Table */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'JetBrains Mono' }}>
             <thead style={{ position: 'sticky', top: 0, background: C.panel, zIndex: 2 }}>
@@ -318,77 +290,47 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
             </thead>
             <tbody>
               {filtered.map(n => {
-                const col    = TYPE_COLOR[n.type] || C.muted;
-                const isSel  = selected?.name === n.name;
-                const rels   = edgeMap[n.name] || { out: [], in: [] };
-                const total  = rels.out.length + rels.in.length;
-                const flags  = getFlags(n, rels);
-
+                const col   = TYPE_COLOR[n.type] || C.muted;
+                const isSel = selected?.name === n.name;
+                const rels  = edgeMap[n.name] || { out: [], in: [] };
+                const total = rels.out.length + rels.in.length;
+                const flags = getFlags(n, rels);
                 return (
                   <tr key={n.name}
                     onClick={() => onSelect(isSel ? null : n)}
-                    style={{
-                      borderBottom: `1px solid ${C.border}`,
-                      background: isSel ? `${col}12` : 'transparent',
-                      cursor: 'pointer',
-                    }}
+                    style={{ borderBottom: `1px solid ${C.border}`, background: isSel ? `${col}12` : 'transparent', cursor: 'pointer' }}
                     onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = `${C.border}28`; }}
                     onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = 'transparent'; }}
                   >
-                    {/* Type */}
                     <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
-                      <span style={{
-                        background: `${col}18`, color: col,
-                        padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700,
-                        border: `1px solid ${col}28`,
-                      }}>
+                      <span style={{ background: `${col}18`, color: col, padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, border: `1px solid ${col}28` }}>
                         {TYPE_ICON[n.type]} {n.type}
                       </span>
                     </td>
-
-                    {/* Name */}
                     <td style={{ padding: '8px 12px', color: C.text, fontWeight: 600, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {n.name}
                     </td>
-
-                    {/* Object */}
                     <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
-                      {n.object
-                        ? <span style={{ color: C.accent4, fontSize: 11 }}>🗄 {n.object}</span>
-                        : <span style={{ color: C.muted }}>—</span>}
+                      {n.object ? <span style={{ color: C.accent4, fontSize: 11 }}>🗄 {n.object}</span> : <span style={{ color: C.muted }}>—</span>}
                     </td>
-
-                    {/* Context */}
                     <td style={{ padding: '8px 12px', color: C.muted, fontSize: 10, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {n.events?.join(', ') || n.triggerType || n.processType || n.recTrigType || '—'}
                     </td>
-
-                    {/* Edge count */}
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      {total > 0 ? (
-                        <span style={{
-                          fontWeight: 700,
-                          color: total >= 8 ? C.danger : total >= 5 ? C.warning : C.muted2,
-                          fontSize: 12,
-                        }}>
-                          {total}
-                          <span style={{ color: C.muted, fontWeight: 400, fontSize: 9 }}>
-                            {' '}({rels.out.length}↑{rels.in.length}↓)
+                      {total > 0
+                        ? <span style={{ fontWeight: 700, color: total >= 8 ? C.danger : total >= 5 ? C.warning : C.muted2, fontSize: 12 }}>
+                            {total}
+                            <span style={{ color: C.muted, fontWeight: 400, fontSize: 9 }}> ({rels.out.length}↑{rels.in.length}↓)</span>
                           </span>
-                        </span>
-                      ) : <span style={{ color: C.muted }}>—</span>}
+                        : <span style={{ color: C.muted }}>—</span>}
                     </td>
-
-                    {/* Flags */}
                     <td style={{ padding: '8px 12px' }}>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                         {flags.map(f => (
                           <span key={f.label} title={f.title} style={{
                             background: `${f.col}18`, color: f.col,
-                            padding: '1px 6px', borderRadius: 3,
-                            fontSize: 9, fontWeight: 700,
-                            border: `1px solid ${f.col}28`,
-                            whiteSpace: 'nowrap',
+                            padding: '1px 6px', borderRadius: 3, fontSize: 9, fontWeight: 700,
+                            border: `1px solid ${f.col}28`, whiteSpace: 'nowrap',
                           }}>
                             {f.label}
                           </span>
@@ -400,7 +342,6 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
               })}
             </tbody>
           </table>
-
           {filtered.length === 0 && (
             <div style={{ textAlign: 'center', color: C.muted, padding: 60, fontFamily: 'JetBrains Mono', fontSize: 13 }}>
               No results
@@ -420,25 +361,28 @@ export default function TableView({ nodes, edges, selected, onSelect, typeFilter
   );
 }
 
-// ── Flag builder ──────────────────────────────────────────────────────────────
 function getFlags(n, rels) {
   const flags = [];
-  const totalEdges = rels.out.length + rels.in.length;
+  const totalEdges  = rels.out.length + rels.in.length;
   const hasInferred = rels.out.some(e => e.inferred) || rels.in.some(e => e.inferred);
+  const hasCrossObjFormula = n.formulaFields?.some(ff => ff.crossObjectRefs?.length > 0);
 
-  if (totalEdges >= 8)  flags.push({ label: '🔥 Hub',       col: C.danger,   title: `${totalEdges} total edges` });
-  if (hasInferred)       flags.push({ label: '⚠ DML Chain', col: '#f59e0b',  title: 'Has inferred DML→Trigger edge' });
-  if (n.isBatch)         flags.push({ label: 'Batch',        col: '#7c3aed',  title: 'Database.Batchable' });
-  if (n.isQueueable)     flags.push({ label: 'Queueable',    col: '#7c3aed',  title: 'Queueable' });
-  if (n.isSchedulable)   flags.push({ label: 'Scheduled',    col: '#7c3aed',  title: 'Schedulable' });
-  if (n.isFuture)        flags.push({ label: '@future',      col: '#7c3aed',  title: '@future method' });
-  if (n.isInvocable)     flags.push({ label: 'Invocable',    col: '#00d4ff',  title: '@InvocableMethod' });
-  if (n.restResource)    flags.push({ label: 'REST',         col: '#10b981',  title: n.restResource });
-  if (n.callouts?.length)flags.push({ label: 'Callout',      col: '#f59e0b',  title: n.callouts.join(', ') });
-  if (n.publishes?.length)flags.push({ label: '📡 Event',   col: '#f59e0b',  title: `Publishes: ${n.publishes.join(', ')}` });
-  if (n.isTriggerHandler)flags.push({ label: 'Handler',      col: '#ff6b35',  title: `extends ${n.extendsClass}` });
-  if (n.processType === 'Flow') flags.push({ label: 'Screen', col: '#ec4899', title: 'User-facing screen flow' });
-  if (totalEdges === 0)  flags.push({ label: 'Isolated',     col: '#64748b',  title: 'No connections found' });
+  if (totalEdges >= 8)       flags.push({ label: '🔥 Hub',         col: C.danger,   title: `${totalEdges} total edges` });
+  if (hasInferred)            flags.push({ label: '⚠ DML Chain',   col: '#f59e0b',  title: 'Has inferred DML→Trigger edge' });
+  if (n.isBatch)              flags.push({ label: 'Batch',          col: '#7c3aed',  title: 'Database.Batchable' });
+  if (n.isQueueable)          flags.push({ label: 'Queueable',      col: '#7c3aed',  title: 'Queueable' });
+  if (n.isSchedulable)        flags.push({ label: 'Scheduled',      col: '#7c3aed',  title: 'Schedulable' });
+  if (n.isFuture)             flags.push({ label: '@future',        col: '#7c3aed',  title: '@future method' });
+  if (n.isInvocable)          flags.push({ label: 'Invocable',      col: '#00d4ff',  title: '@InvocableMethod' });
+  if (n.restResource)         flags.push({ label: 'REST',           col: '#10b981',  title: n.restResource });
+  if (n.callouts?.length)     flags.push({ label: 'Callout',        col: '#f59e0b',  title: n.callouts.join(', ') });
+  if (n.publishes?.length)    flags.push({ label: '📡 Event',       col: '#f59e0b',  title: `Publishes: ${n.publishes.join(', ')}` });
+  if (n.isTriggerHandler)     flags.push({ label: 'Handler',        col: '#ff6b35',  title: `extends ${n.extendsClass}` });
+  if (n.processType === 'Flow') flags.push({ label: 'Screen',       col: '#ec4899',  title: 'User-facing screen flow' });
+  if (n.formulas?.length)     flags.push({ label: `ƒ ${n.formulas.length} Flow Formula${n.formulas.length > 1 ? 's' : ''}`, col: '#a78bfa', title: 'Has flow formula variables' });
+  if (n.formulaFields?.length)flags.push({ label: `ƒ ${n.formulaFields.length} Formula Field${n.formulaFields.length > 1 ? 's' : ''}`, col: '#a78bfa', title: 'Has formula fields' });
+  if (hasCrossObjFormula)     flags.push({ label: '↗ƒ Cross-Obj',  col: '#f59e0b',  title: 'Formula references another object' });
+  if (totalEdges === 0)       flags.push({ label: 'Isolated',       col: '#64748b',  title: 'No connections found' });
 
   return flags;
 }

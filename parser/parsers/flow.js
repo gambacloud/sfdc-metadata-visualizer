@@ -4,6 +4,7 @@
  */
 
 const { XMLParser } = require('fast-xml-parser');
+const { parseFlowFormulas } = require('./flowFormula');
 
 const parser = new XMLParser({ ignoreAttributes: false, isArray: () => true });
 
@@ -13,76 +14,91 @@ function parseFlow(name, xml) {
 
     const flow = doc?.Flow?.[0] ?? {};
 
-    // processType / label
-    const processType  = str(flow.processType);
-    const label        = str(flow.label) || name;
-    const status       = str(flow.status);
+    // ── Basic metadata ────────────────────────────────────────────────────────
+    const processType = str(first(flow.processType));
+    const label       = str(first(flow.label)) || name;
+    const status      = str(first(flow.status));
 
-    // Trigger info — can live in <start> or top-level
-    const start        = first(flow.start);
-    const object       = str(start?.object) || str(flow.object);
-    const triggerType  = str(start?.triggerType)  || str(flow.triggerType);
-    const recTrigType  = str(start?.recordTriggerType);
+    // ── Trigger info ──────────────────────────────────────────────────────────
+    const start      = first(flow.start);
+    const object     = str(start?.object?.[0]) || str(first(flow.object));
+    const triggerType= str(start?.triggerType?.[0]) || str(first(flow.triggerType));
+    const recTrigType= str(start?.recordTriggerType?.[0]);
 
-    // Entry conditions (filter fields on start)
+    // ── Entry conditions ──────────────────────────────────────────────────────
     const entryFilters = (start?.filters ?? []).map(f => ({
-        field:    str(f.field),
-        operator: str(f.operator),
-        value:    str(f.value?.stringValue) || str(f.value?.numberValue),
+        field:    str(first(f.field)),
+        operator: str(first(f.operator)),
+        value:    str(first(f.value?.[0]?.stringValue)) || str(first(f.value?.[0]?.numberValue)),
     })).filter(f => f.field);
 
-    // Subflows
-    const subflows = (flow.subflows ?? []).map(s => str(s.flowName)).filter(Boolean);
+    // ── Subflows ──────────────────────────────────────────────────────────────
+    const subflows = (flow.subflows ?? []).map(s => str(first(s.flowName))).filter(Boolean);
 
-    // Action calls (Apex invocable actions)
+    // ── Action calls (Apex invocable) ─────────────────────────────────────────
     const actionCalls = (flow.actionCalls ?? []).map(a => ({
-        name:       str(a.actionName),
-        type:       str(a.actionType),
-        label:      str(a.label),
+        name:  str(first(a.actionName)),
+        type:  str(first(a.actionType)),
+        label: str(first(a.label)),
     })).filter(a => a.name);
 
-    // DML — objects this flow reads/writes
-    const recordUpdates = collect(flow, 'recordUpdates');
-    const recordCreates = collect(flow, 'recordCreates');
-    const recordDeletes = collect(flow, 'recordDeletes');
-    const recordLookups = collect(flow, 'recordLookups');
-
+    // ── DML ───────────────────────────────────────────────────────────────────
     const dmlObjects = unique([
-        ...recordUpdates.map(r => str(r.object)),
-        ...recordCreates.map(r => str(r.object)),
-        ...recordDeletes.map(r => str(r.object)),
+        ...(flow.recordUpdates ?? []).map(r => str(first(r.object))),
+        ...(flow.recordCreates ?? []).map(r => str(first(r.object))),
+        ...(flow.recordDeletes ?? []).map(r => str(first(r.object))),
     ]);
-    const queryObjects = unique(recordLookups.map(r => str(r.object)));
+    const queryObjects = unique((flow.recordLookups ?? []).map(r => str(first(r.object))));
 
-    // Decisions — extract for future branching display
+    // ── Decisions ─────────────────────────────────────────────────────────────
     const decisions = (flow.decisions ?? []).map(d => ({
-        name:  str(d.name || d.n),
-        label: str(d.label),
-        rules: (d.rules ?? []).map(r => str(r.label)).filter(Boolean),
+        name:  str(first(d.name || d.n)),
+        label: str(first(d.label)),
+        rules: (d.rules ?? []).map(r => str(first(r.label))).filter(Boolean),
     })).filter(d => d.name);
+
+    // ── Variables ─────────────────────────────────────────────────────────────
+    const variables = (flow.variables ?? []).map(v => ({
+        name:      str(first(v.name || v.n)),
+        dataType:  str(first(v.dataType)),
+        isInput:   str(first(v.isInput))  === 'true',
+        isOutput:  str(first(v.isOutput)) === 'true',
+        objectType:str(first(v.objectType)),
+    })).filter(v => v.name);
+
+    // ── Formulas ─────────────────────────────────────────────────────────────
+    // Feature 1 & 2: formula expressions + field references
+    const formulas = parseFlowFormulas(xml, object);
+
+    // Collect field refs from formulas as additional implicit dependencies
+    const formulaFieldRefs = unique(
+        formulas.flatMap(f => f.fieldRefs.map(r => r.field)).filter(Boolean)
+    );
 
     return {
         name,
         label,
-        type:          'Flow',
+        type:         'Flow',
         processType,
         status,
-        object:        object || null,
-        triggerType:   triggerType || null,
-        recTrigType:   recTrigType || null,
+        object:       object   || null,
+        triggerType:  triggerType || null,
+        recTrigType:  recTrigType || null,
         entryFilters,
         subflows,
         actionCalls,
         dmlObjects,
         queryObjects,
         decisions,
+        variables,
+        formulas,          // ← new: full formula list with expressions
+        formulaFieldRefs,  // ← new: field names referenced by formulas
     };
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-function str(v) { return typeof v === 'string' ? v.trim() : (v != null ? String(v) : null); }
-function first(arr) { return Array.isArray(arr) ? arr[0] : arr; }
-function collect(obj, key) { return Array.isArray(obj[key]) ? obj[key] : []; }
-function unique(arr) { return [...new Set(arr.filter(Boolean))]; }
+function str(v)  { return typeof v === 'string' ? v.trim() : (v != null ? String(v).trim() : null); }
+function first(v){ return Array.isArray(v) ? v[0] : v; }
+function unique(arr){ return [...new Set(arr.filter(Boolean))]; }
 
 module.exports = { parseFlow };

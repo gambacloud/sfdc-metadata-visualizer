@@ -1,0 +1,7 @@
+  {
+    id: 'has_formulas',
+    label: 'Has Formulas',
+    icon: 'ƒ',
+    description: 'Objects with formula fields or flows with formula variables',
+    fn: (n) => (n.formulaFields?.length > 0) || (n.formulas?.length > 0),
+  },

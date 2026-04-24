@@ -19,6 +19,7 @@ export const C = {
   danger:   '#ef4444',
   inferred: '#f59e0b',
   external: '#6b7280',
+  formula:  '#a78bfa',   // formula edges / violet-light
 };
 
 export const TYPE_COLOR = {
@@ -62,6 +63,7 @@ export const EDGE_LABELS = {
   'rest-callout':    'callout',
   'extends':         'extends',
   'flow-invoke':     'invokes flow',
+  'formula-ref':     'formula ref',   // ← new
 };
 
 export const EDGE_COLOR = {
@@ -81,4 +83,5 @@ export const EDGE_COLOR = {
   'rest-callout':    C.external,
   'extends':         C.muted,
   'flow-invoke':     C.accent,
+  'formula-ref':     C.formula,       // ← new
 };
