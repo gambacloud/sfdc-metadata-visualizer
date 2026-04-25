@@ -6,22 +6,22 @@
   "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
-    "electron":      "electron .",
-    "build:viewer":  "cd viewer && npm install && npm run build",
-    "build:electron":"electron-builder",
-    "build:win":     "npm run build:viewer && node generate-icons.js && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
-    "build:all":     "npm run build:viewer && npm run build:electron",
-    "dev":           "cd viewer && npm run dev"
+    "electron": "electron .",
+    "build:viewer": "cd viewer && npm install && npm run build",
+    "build:electron": "electron-builder",
+    "build:win": "npm run build:viewer && node generate-icons.js && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
+    "build:all": "npm run build:viewer && npm run build:electron",
+    "dev": "cd viewer && npm run dev"
   },
   "devDependencies": {
-    "cross-env":      "^7.0.3",
-    "electron":       "^30.0.0",
-    "electron-builder":"^24.13.3"
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId":       "com.gambacloud.sfdc-metadata-visualizer",
+    "appId": "com.gambacloud.sfdc-metadata-visualizer",
     "productName": "SFDC Metadata Visualizer",
-    "copyright":   "Copyright © 2025 gambacloud",
+    "copyright": "Copyright © 2025 gambacloud",
     "directories": {
       "output": "dist-electron"
     },
@@ -31,44 +31,76 @@
     ],
     "extraResources": [
       {
-        "from":   "viewer/dist",
-        "to":     "viewer-dist",
-        "filter": ["**/*"]
+        "from": "viewer/dist",
+        "to": "viewer-dist",
+        "filter": [
+          "**/*"
+        ]
       },
       {
-        "from":   "parser",
-        "to":     "parser",
-        "filter": ["**/*", "!node_modules"]
+        "from": "parser",
+        "to": "parser",
+        "filter": [
+          "**/*",
+          "!node_modules"
+        ]
       },
       {
-        "from":   "parser/node_modules",
-        "to":     "parser/node_modules",
-        "filter": ["**/*"]
+        "from": "parser/node_modules",
+        "to": "parser/node_modules",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon":   "electron/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/icon.ico"
     },
     "nsis": {
-      "oneClick":                          false,
-      "allowToChangeInstallationDirectory":true,
-      "installerIcon":                     "electron/icon.ico",
-      "uninstallerIcon":                   "electron/icon.ico",
-      "installerHeaderIcon":               "electron/icon.ico",
-      "createDesktopShortcut":             true,
-      "createStartMenuShortcut":           true,
-      "shortcutName":                      "SFDC Metadata Visualizer"
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "electron/icon.ico",
+      "uninstallerIcon": "electron/icon.ico",
+      "installerHeaderIcon": "electron/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SFDC Metadata Visualizer"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
-      "icon":     "electron/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "electron/icon.icns",
       "category": "public.app-category.developer-tools"
     },
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
-      "icon":     "electron/icon.png",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/icon.png",
       "category": "Development"
     }
+  },
+  "dependencies": {
+    "archiver": "^7.0.1"
   }
 }
