@@ -1,22 +1,25 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { C, TYPE_COLOR, TYPE_ICON } from './constants.js';
-import DAGView          from './components/DAGView.jsx';
+import DAGView           from './components/DAGView.jsx';
 import ObjectCentricView from './components/ObjectCentricView.jsx';
-import TableView        from './components/TableView.jsx';
-import DetailPanel      from './components/DetailPanel.jsx';
+import TableView         from './components/TableView.jsx';
+import ChainView         from './components/ChainView.jsx';
+import DetailPanel       from './components/DetailPanel.jsx';
 
 const ALL_TYPES = ['Flow', 'Trigger', 'ApexClass', 'CustomObject', 'PlatformEvent', 'LWC', 'Aura'];
+
 const VIEWS = [
-  { id: 'dag',    label: '⬡ DAG',     title: 'Layered execution flow' },
-  { id: 'object', label: '◎ Object',  title: 'Object-centric impact view' },
-  { id: 'table',  label: '▤ Table',   title: 'Searchable index' },
+  { id: 'chain',  label: '⛓ Chain',  title: 'Execution chain — step by step' },
+  { id: 'dag',    label: '⬡ DAG',    title: 'Layered execution flow' },
+  { id: 'object', label: '◎ Object', title: 'Object-centric impact view' },
+  { id: 'table',  label: '▤ Table',  title: 'Searchable index' },
 ];
 
 export default function App() {
   const [graphData,   setGraphData]   = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
-  const [view,        setView]        = useState('dag');
+  const [view,        setView]        = useState('chain');
   const [selected,    setSelected]    = useState(null);
   const [typeFilters, setTypeFilters] = useState(new Set());
 
@@ -53,6 +56,9 @@ export default function App() {
 
   const { nodes, edges } = graphData;
 
+  // Type filter pills only shown for views that support them
+  const showTypeFilters = view === 'dag' || view === 'table';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg }}>
 
@@ -70,38 +76,55 @@ export default function App() {
           <span style={{ fontSize: 18 }}>☁️</span>
           <div>
             <div style={{ fontFamily: 'JetBrains Mono', fontWeight: 800, fontSize: 12, color: C.accent, letterSpacing: 1 }}>SFDC·KB</div>
-            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 8,  color: C.muted,  letterSpacing: 2 }}>METADATA VISUALIZER</div>
+            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 8,  color: C.muted, letterSpacing: 2 }}>METADATA VISUALIZER</div>
           </div>
         </div>
 
-        {/* Type filter pills */}
+        {/* Type filter pills — only for DAG + Table */}
         <div style={{ display: 'flex', alignItems: 'center', overflowX: 'auto', flex: 1 }}>
-          {ALL_TYPES.map(type => {
-            const count  = stats?.counts[type] || 0;
-            if (count === 0) return null;
-            const col    = TYPE_COLOR[type];
-            const active = typeFilters.has(type);
-            return (
-              <button key={type} onClick={() => toggleType(type)}
-                title={`${active ? 'Hide' : 'Show'} ${type}`}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 16px', height: '100%', flexShrink: 0,
-                  background:   active ? `${col}18` : 'transparent',
-                  border:       'none',
-                  borderBottom: active ? `3px solid ${col}` : '3px solid transparent',
-                  borderRight:  `1px solid ${C.border}`,
-                  cursor:       'pointer', gap: 1,
-                }}>
-                <span style={{ fontSize: 14 }}>{TYPE_ICON[type]}</span>
-                <span style={{ fontFamily: 'JetBrains Mono', fontWeight: 800, fontSize: 13, color: active ? col : C.muted2, lineHeight: 1 }}>{count}</span>
-                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8,  color: active ? col : C.muted, letterSpacing: 0.5 }}>{type}</span>
-              </button>
-            );
-          })}
+          {showTypeFilters
+            ? ALL_TYPES.map(type => {
+                const count  = stats?.counts[type] || 0;
+                if (count === 0) return null;
+                const col    = TYPE_COLOR[type];
+                const active = typeFilters.has(type);
+                return (
+                  <button key={type} onClick={() => toggleType(type)}
+                    title={`${active ? 'Hide' : 'Show'} ${type}`}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 14px', height: '100%', flexShrink: 0,
+                      background:   active ? `${col}18` : 'transparent',
+                      border:       'none',
+                      borderBottom: active ? `3px solid ${col}` : '3px solid transparent',
+                      borderRight:  `1px solid ${C.border}`,
+                      cursor:       'pointer', gap: 1,
+                    }}>
+                    <span style={{ fontSize: 13 }}>{TYPE_ICON[type]}</span>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontWeight: 800, fontSize: 12, color: active ? col : C.muted2, lineHeight: 1 }}>{count}</span>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8,  color: active ? col : C.muted }}>{type}</span>
+                  </button>
+                );
+              })
+            : (
+              // Summary bar for other views
+              <div style={{ padding: '0 20px', display: 'flex', gap: 20, alignItems: 'center' }}>
+                {ALL_TYPES.map(type => {
+                  const count = stats?.counts[type] || 0;
+                  if (!count) return null;
+                  return (
+                    <span key={type} style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: C.muted }}>
+                      <span style={{ color: TYPE_COLOR[type] }}>{TYPE_ICON[type]}</span>
+                      {' '}<span style={{ color: C.muted2, fontWeight: 700 }}>{count}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            )
+          }
         </div>
 
-        {/* Meta */}
+        {/* Meta + edge count */}
         <div style={{
           padding: '0 16px', borderLeft: `1px solid ${C.border}`,
           display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, flexShrink: 0,
@@ -122,14 +145,14 @@ export default function App() {
           {VIEWS.map(v => (
             <button key={v.id} onClick={() => setView(v.id)} title={v.title}
               style={{
-                padding: '0 20px', height: '100%',
+                padding: '0 18px', height: '100%',
                 background:   view === v.id ? `${C.accent}15` : 'transparent',
                 color:        view === v.id ? C.accent : C.muted,
                 border:       'none',
                 borderBottom: view === v.id ? `3px solid ${C.accent}` : '3px solid transparent',
                 borderLeft:   `1px solid ${C.border}`,
                 fontFamily:   'JetBrains Mono', fontWeight: 700, fontSize: 12,
-                cursor:       'pointer', flexShrink: 0,
+                cursor:       'pointer', flexShrink: 0, whiteSpace: 'nowrap',
               }}>
               {v.label}
             </button>
@@ -140,6 +163,12 @@ export default function App() {
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {view === 'chain' && (
+            <ChainView
+              nodes={nodes} edges={edges}
+              selected={selected} onSelect={setSelected}
+            />
+          )}
           {view === 'dag' && (
             <DAGView
               nodes={nodes} edges={edges}
@@ -175,8 +204,6 @@ export default function App() {
     </div>
   );
 }
-
-// ── Screens ───────────────────────────────────────────────────────────────────
 
 function LoadingScreen() {
   return (
