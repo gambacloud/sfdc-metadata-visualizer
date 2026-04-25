@@ -15,6 +15,9 @@ on:
         default: 'false'
         type: boolean
 
+permissions:
+  contents: write
+
 jobs:
 
   # ── 1. Build the React viewer ───────────────────────────────────────────────
@@ -71,6 +74,8 @@ jobs:
     name: Build Windows EXE
     needs: [build-viewer, build-parser]
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
