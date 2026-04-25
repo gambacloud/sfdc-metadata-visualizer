@@ -1,11 +1,17 @@
 node_modules/
+parser/node_modules/
+viewer/node_modules/
 data/index.json
 data/positions.json
+data/exports/
 demo-metadata.zip
 viewer/public/index.json
 viewer/dist/
 dist/
 dist-electron/
+electron/icon.png
+electron/icon.ico
+electron/icon.icns
 .DS_Store
 Thumbs.db
 *.log

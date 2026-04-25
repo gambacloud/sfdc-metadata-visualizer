@@ -33,9 +33,26 @@ if errorlevel 1 (
     set HAS_GIT=1
 )
 
+:: ── Generate icons if missing ─────────────────────────────────────────────────
+if not exist electron\icon.ico (
+    echo  Generating icons...
+    node generate-icons.js
+    echo  [OK] Icons generated.
+)
+
 :: ── Navigate to repo root ─────────────────────────────────────────────────────
 cd /d "%~dp0"
 echo  [OK] Working directory: %CD%
+
+:: ── Install root dependencies (electron + electron-builder) ──────────────────
+echo.
+echo  [0/3] Installing root dependencies...
+call npm install --silent
+if errorlevel 1 (
+    echo  [ERROR] npm install failed in root
+    pause & exit /b 1
+)
+echo  [OK] Root dependencies ready.
 
 :: ── Install parser dependencies ───────────────────────────────────────────────
 echo.
