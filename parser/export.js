@@ -133,11 +133,12 @@ nodes.forEach(n => {
             );
         }
 
+        // without sharing → LOW (usually intentional in org-wide infrastructure)
         if (n.withoutSharing) {
-            addConcern('MEDIUM', 'Security',
+            addConcern('LOW', 'Security',
                 n.name, n.type,
                 'Declared without sharing — bypasses record-level security',
-                'Verify this is intentional. Consider inherited sharing where possible.'
+                'Usually intentional in org-wide automation classes. Flag for review if this is business logic, not infrastructure.'
             );
         }
 
@@ -176,11 +177,13 @@ nodes.forEach(n => {
 
     // ── Flow specifics ────────────────────────────────────────────────────────
     if (n.type === 'Flow') {
+
+        // No entry conditions → HIGH (proven real-world performance killer)
         if (n.triggerType && n.entryFilters?.length === 0 && n.status === 'Active') {
-            addConcern('MEDIUM', 'Performance',
+            addConcern('HIGH', 'Performance',
                 n.name, n.type,
-                'Record-triggered flow with no entry conditions — fires on every save',
-                'Add entry conditions to limit unnecessary executions. Major performance impact at scale.'
+                'Record-triggered flow with no entry conditions — fires on EVERY record save, no exceptions',
+                'This is one of the most common Salesforce performance killers. Add entry conditions immediately. At scale (bulk loads, integrations) this multiplies execution cost across every record in the transaction.'
             );
         }
 
@@ -444,7 +447,8 @@ The following CSVs are attached. Please analyze them and provide:
 - Async boundaries: new execution context, new governor limit reset.
 - DML/SOQL in loop detection is heuristic — confirm with code review before acting.
 - Coverage gaps are heuristic — test classes may exist with non-standard naming.
-- without sharing flag means record-level security bypassed — verify intent.
+- "without sharing" classes are flagged LOW — usually intentional org-wide infrastructure. Only escalate if found in business logic classes.
+- Flows with no entry conditions are flagged HIGH — this is a proven real-world performance concern at scale.
 
 ## Files Attached
 - concerns.csv       — ${concerns.length} static analysis findings
