@@ -1,13 +1,6 @@
 /**
  * electron/main.js
  * Electron main process.
- *
- * What this does:
- *  1. On launch — opens a file picker for the metadata ZIP
- *  2. Runs the parser (Node.js, bundled inside the app)
- *  3. Writes index.json to a temp folder
- *  4. Serves the built viewer via a local HTTP server
- *  5. Opens the viewer in an Electron BrowserWindow
  */
 
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
@@ -31,10 +24,14 @@ let mainWindow = null;
 let server     = null;
 let serverPort = 0;
 
+// Suppress GPU cache errors — not needed for a text/SVG app
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-
     serverPort = await startStaticServer(VIEWER_DIR);
     createWindow();
 });
@@ -54,22 +51,22 @@ function createWindow() {
         title: 'SFDC Metadata Visualizer',
         backgroundColor: '#080d18',
         webPreferences: {
-            preload:         path.join(__dirname, 'preload.js'),
+            preload:          path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration:  false,
         },
-        // Custom titlebar feel
         titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
         icon: path.join(__dirname, 'icon.png'),
     });
 
-    // If index.json already exists from a previous run, load viewer directly
     if (fs.existsSync(INDEX_JSON)) {
         loadViewer();
     } else {
-        // Show loading page asking user to pick a ZIP
         mainWindow.loadURL(`http://localhost:${serverPort}/loader.html`);
     }
+
+    // Show devtools in dev mode to help debug
+    if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
 
     mainWindow.on('closed', () => { mainWindow = null; });
 }
@@ -78,9 +75,8 @@ function loadViewer() {
     mainWindow.loadURL(`http://localhost:${serverPort}/index.html`);
 }
 
-// ── IPC — from renderer ───────────────────────────────────────────────────────
+// ── IPC handlers ──────────────────────────────────────────────────────────────
 
-// User clicked "Open ZIP" button
 ipcMain.handle('pick-zip', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         title:      'Select Salesforce Metadata ZIP',
@@ -91,35 +87,108 @@ ipcMain.handle('pick-zip', async () => {
     return { canceled: false, zipPath: result.filePaths[0] };
 });
 
-// Run parser on selected ZIP
 ipcMain.handle('run-parser', async (event, zipPath) => {
     return new Promise((resolve) => {
-        const { execFile } = require('child_process');
-        const parserScript = path.join(PARSER_DIR, 'index.js');
-        const node = process.execPath; // bundled Node
+        // ── Key fix: find Node.js correctly in both dev and packaged mode ─────
+        // In packaged Electron, process.execPath = the app EXE, not node.
+        // We bundle Node.js separately, or use the node binary from PATH.
+        // Strategy: try bundled node first, fall back to system node.
 
-        const child = execFile(node, [parserScript, '--zip', zipPath, '--out', INDEX_JSON], {
-            cwd: PARSER_DIR,
-        });
+        const { execFile, exec } = require('child_process');
 
-        let stdout = '', stderr = '';
-        child.stdout?.on('data', d => { stdout += d; event.sender.send('parser-log', d.toString()); });
-        child.stderr?.on('data', d => { stderr += d; event.sender.send('parser-log', d.toString()); });
-
-        child.on('close', code => {
-            if (code === 0) {
-                // Copy index.json into viewer dist so the static server can serve it
-                fs.copyFileSync(INDEX_JSON, path.join(VIEWER_DIR, 'index.json'));
-                resolve({ ok: true });
-            } else {
-                resolve({ ok: false, error: stderr || stdout });
+        // Find node executable
+        findNodePath((nodePath, nodeErr) => {
+            if (nodeErr || !nodePath) {
+                event.sender.send('parser-log', `❌ Cannot find Node.js: ${nodeErr}\n`);
+                resolve({ ok: false, error: 'Node.js not found. Please install Node.js 18+ from nodejs.org' });
+                return;
             }
+
+            event.sender.send('parser-log', `Using Node: ${nodePath}\n`);
+            event.sender.send('parser-log', `Parser dir: ${PARSER_DIR}\n`);
+            event.sender.send('parser-log', `Output: ${INDEX_JSON}\n\n`);
+
+            const parserScript = path.join(PARSER_DIR, 'index.js');
+            const child = execFile(nodePath, [parserScript, '--zip', zipPath, '--out', INDEX_JSON], {
+                cwd:     PARSER_DIR,
+                timeout: 10 * 60 * 1000, // 10 minute timeout for large ZIPs
+            });
+
+            child.stdout?.on('data', d => {
+                const msg = d.toString();
+                console.log(msg);
+                event.sender.send('parser-log', msg);
+            });
+            child.stderr?.on('data', d => {
+                const msg = d.toString();
+                console.error(msg);
+                event.sender.send('parser-log', msg);
+            });
+
+            child.on('close', code => {
+                if (code === 0) {
+                    try {
+                        fs.copyFileSync(INDEX_JSON, path.join(VIEWER_DIR, 'index.json'));
+                    } catch (e) {
+                        console.error('Failed to copy index.json to viewer:', e);
+                    }
+                    resolve({ ok: true });
+                } else {
+                    resolve({ ok: false, error: `Parser exited with code ${code}` });
+                }
+            });
+
+            child.on('error', err => {
+                resolve({ ok: false, error: err.message });
+            });
         });
     });
 });
 
-// Open external links in default browser
 ipcMain.on('open-external', (_, url) => shell.openExternal(url));
+
+// ── Find Node.js path ─────────────────────────────────────────────────────────
+function findNodePath(callback) {
+    const { exec } = require('child_process');
+
+    // 1. Check common Windows locations
+    const candidates = [
+        'node',                                           // system PATH
+        'C:\\Program Files\\nodejs\\node.exe',
+        'C:\\Program Files (x86)\\nodejs\\node.exe',
+        path.join(os.homedir(), 'AppData', 'Roaming', 'nvm', 'current', 'node.exe'),
+        path.join(os.homedir(), '.nvm', 'current', 'node'),
+    ];
+
+    // 2. First try `where node` / `which node`
+    const whereCmd = process.platform === 'win32' ? 'where node' : 'which node';
+    exec(whereCmd, (err, stdout) => {
+        if (!err && stdout.trim()) {
+            const nodePath = stdout.trim().split('\n')[0].trim();
+            callback(nodePath, null);
+            return;
+        }
+
+        // 3. Try candidates in order
+        tryNext(candidates, 0, callback);
+    });
+}
+
+function tryNext(candidates, i, callback) {
+    if (i >= candidates.length) {
+        callback(null, 'Node.js not found in any known location');
+        return;
+    }
+
+    const { execFile } = require('child_process');
+    execFile(candidates[i], ['--version'], { timeout: 3000 }, (err) => {
+        if (!err) {
+            callback(candidates[i], null);
+        } else {
+            tryNext(candidates, i + 1, callback);
+        }
+    });
+}
 
 // ── Static HTTP server ────────────────────────────────────────────────────────
 function startStaticServer(dir) {
@@ -137,11 +206,9 @@ function startStaticServer(dir) {
 
         server = http.createServer((req, res) => {
             let filePath = path.join(dir, req.url === '/' ? 'index.html' : req.url);
-            // Strip query strings
             filePath = filePath.split('?')[0];
 
             if (!fs.existsSync(filePath)) {
-                // SPA fallback
                 filePath = path.join(dir, 'index.html');
             }
 
